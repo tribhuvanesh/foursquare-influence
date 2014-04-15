@@ -1,51 +1,72 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[2]:
 
 import networkx as nx
 
+from utils import *
 
-# In[13]:
+# In[3]:
 
-import matplotlib.pyplot as plt
-import numpy as np
-# In[14]:
+#import matplotlib.pyplot as plt
+
+
+# In[4]:
 
 import random
-import sys
-
-# In[52]:
-
-NUM_CASCADES = 500
-
-
-# In[53]:
-
-WALK_LEN = 6
-
-
-# In[43]:
-
-ffr = open('only_zurich_friendship.out', 'r')
-
-
-# In[50]:
-
-fout = open('synth-cascades-zurich-1.txt', 'w')
 
 
 # In[5]:
 
-added_nodes = set()
+import numpy as np
 
 
 # In[6]:
 
+#from collections import deque
+
+
+# In[18]:
+
+NUM_CASCADES = 200
+
+
+# In[8]:
+
+WALK_LEN = 10
+
+
+# In[9]:
+
+TIME_LIMIT = 5
+#TIME_LIMIT = 100
+
+
+# In[10]:
+
+#ffr = open('small_graph.txt', 'r')
+
+ffr = open('only_zurich_friendship.out', 'r')
+
+# In[19]:
+
+fout = open('synth-cascades-zurich-complete.txt', 'w')
+
+
+fgr = open('ground_truth.txt', 'w')
+
+# In[12]:
+
+added_nodes = set()
+
+
+# In[13]:
+
 G = nx.DiGraph()
 
 
-# In[7]:
+# In[14]:
 
 for line in ffr:
     try:
@@ -58,41 +79,35 @@ for line in ffr:
     except ValueError:
         print line
 
-
-# In[41]:
+#G = nx.read_gexf("synth-cascades-zurich-fig2.gexf")
+#added_nodes = list(G.nodes())
 pos = nx.spring_layout(G)
 nx.draw_networkx_edges(G, pos)
-
 edge_labels = dict([((u, v,), d['weight']) for u, v, d in G.edges(data=True)])
-nx.draw_networkx_labels(G, pos, edge_labels=edge_labels)
+#nx.draw_networkx_labels(G, pos, edge_labels=edge_labels)
+#plt.show()
+for edge in edge_labels:
+    fgr.write(str(edge[0]) + " " + str(edge[1]) + " " + str(edge_labels[edge]) + "\n")
 
-# In[42]:
-
-if False:
-    plt.show()
-    sys.exit(0)
-
-# In[17]:
-
-random.choice(list(added_nodes))
-
-
-# In[51]:
+fgr.close()
+# In[20]:
 
 # Write all the nodes to cascades file
-for uid in sorted(list(added_nodes)):
-    fout.write("%d,%d\n" % (uid, uid))
+for uid in sorted(added_nodes):
+    fout.write("%s,%s\n" % (uid, uid))
 fout.write("\n")
 
 
-# In[54]:
-
-for i in range(NUM_CASCADES):
+cascade_edge_count = {}
+for edge in G.edges():
+    cascade_edge_count[edge] = 0
+i = 0
+while 0 in [cascade_edge_count[key] for key in cascade_edge_count]:
     # Pick a random node and start a random walk of length walk_len, with memory
     start_node = random.sample(added_nodes, 1)[0]
     visited_nodes = set()
-    start_time = random.randint(0, 250)
-    cutoff_time = random.randint(start_time, 300)
+    start_time = 1
+    cutoff_time = TIME_LIMIT
     cur_time = start_time
     visit_str = ""
     s = list()
@@ -107,13 +122,15 @@ for i in range(NUM_CASCADES):
         cur_node = s.pop()
         if depth[cur_node] > WALK_LEN:
             continue
-
+        cur_time = activation[cur_node]
         for neighbor in set(G.neighbors(cur_node)):
-            weight = G.get_edge_data(cur_node, neighbor)['weight']
-            activation_time = activation[cur_node] + int((2 - weight) * 10)  # Change this to random
+            trans_rate = G.get_edge_data(cur_node, neighbor)['weight']
+            activation_time = int(np.ceil(cur_time + np.random.exponential(1.0 / trans_rate)))
             if neighbor not in activation or activation_time < activation[neighbor]:
                 activation[neighbor] = activation_time
             depth[neighbor] = depth[cur_node] + 1
+            if activation_time <= cutoff_time:
+                cascade_edge_count[(cur_node, neighbor)] += 1
             s.append(neighbor)
     for node in activation:
         if activation[node] <= cutoff_time:
@@ -121,32 +138,11 @@ for i in range(NUM_CASCADES):
     if len(cascade) == 1:
         continue
 
-    fout.write("%d;" % i)
+    #fout.write("%d;" % i)
+    i += 1
     cascade.sort(key=lambda tup: tup[1])
     cascade_str_array = []
     for elem in cascade:
         cascade_str_array.append(str(elem[0]) + "," + str(elem[1]))
-    #for j in range(WALK_LEN):
-    #    print cur_node, "->",
-    #    visit_str += "%d,%d," % (cur_node, cur_time)
-    #    # Pick a random unvisited neighbour
-    #    for neighbour in set(G.neighbors(cur_node)):
-    #    visited_nodes.add(cur_node)
-    #    try:
-    #        next_node = random.sample(cur_neighbours - visited_nodes, 1)[0]
-    #        edgeData = G.get_edge_data(cur_node, next_node)
-    #        print edgeData['weight']
-    #        cur_node = next_node
-    #        cur_time += 1
-    #    except ValueError:
-    #        break  # End the walk. No more unvisited nodes to traverse
     fout.write(",".join(cascade_str_array) + "\n")
-    #print "END"
-
-
-# In[55]:
-
 fout.close()
-
-
-# In[ ]:
