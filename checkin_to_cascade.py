@@ -1,28 +1,20 @@
 import datetime, time
 import sys
+import tempfile
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 MIN_CHECKINS = 2
-# NEW_EPOCH = 1262304000 # 1-Jan-2010
-NEW_EPOCH = 1293840000 # 1-Jan-2011
+NEW_EPOCH = 1262304000 # 1-Jan-2010
+# NEW_EPOCH = 1293840000 # 1-Jan-2011
+TIME_LIMIT = 350
+TIME_INT = 100
+INSERT_AUX_NODES = True
 
 def main():
-    # fin = open('zurich/checkins-zurich-renum.txt', 'r')
-    # fout = open('zurich/cascades-zurich-renum.txt', 'w')
-    # fusers = open('zurich/users-zurich-renum.txt', 'r')
-    # fin = open('sf/checkins-sf-renum.txt', 'r')
-    # fout = open('sf/cascades-sf-renum.txt', 'w')
-    # fusers = open('sf/users-sf-renum.txt', 'r')
-    # fin = open('london/checkins-london-renum.txt', 'r')
-    # fout = open('london/cascades-london-renum.txt', 'w')
-    # fusers = open('london/users-london-renum.txt', 'r')
-    fin = open('rome/checkins-rome-renum.txt', 'r')
-    fout = open('rome/cascades-rome-renum.txt', 'w')
-    fusers = open('rome/users-rome-renum.txt', 'r')
-    # fin = open('checkins-sf.txt', 'r')
-    # fout = open('cascades-sf.txt', 'w')
-    # fusers = open('users-sf.txt', 'r')
-    # fusers = open('users_300.txt', 'r')
+    fin = open('data/paris-aux/Paris_checkins-renum.txt', 'r')
+    fout = open('data/paris-aux/cascades-paris-renum.txt', 'w')
+    fground = open('data/paris-aux/cascades-paris-ground-truth.txt', 'w')
+    fusers = open('data/paris-aux/friendships-users-renum.txt', 'r')
 
     # Read all valid users and create a set
     # Also write all the users as-is to output cascades file
@@ -33,7 +25,15 @@ def main():
         fout.write(line)
 
     # Separator between users and cascades
-    fout.write('\n')
+    if INSERT_AUX_NODES:
+        # If auxiliary nodes are to be inserted, more node names need to be added.
+        # So, write an incomplete cascade file, and come back to this later.
+        ftemp = tempfile.NamedTemporaryFile()
+        fcasc = ftemp
+        next_node_num = max(valid_uids) + 1
+    else:
+        fout.write("\n")
+        fcasc = fout
 
     # Skip the header
     fin.readline()
@@ -59,7 +59,11 @@ def main():
             if len(dct.keys()) >= MIN_CHECKINS:
                 print 'Dumping %d infections for cascade %d' % (len(cascade), cascade_id)
                 # Dump everything in cascade into file as a single cascade
-                fout.write("%d;" % cascade_id)
+                if INSERT_AUX_NODES:
+                    fcasc.write("%d;%d,1," % (cascade_id, next_node_num))
+                    next_node_num += 1
+                else:
+                    fcasc.write("%d;" % cascade_id)
                 # Take lowest value of check-ins for each user
                 to_write = ''
                 # for _location, _user, _ts in cascade:
@@ -68,7 +72,7 @@ def main():
                     # to_write += "%d,%.2f," % (_user, float(round(_ts, -3)))
                     day = (_ts - NEW_EPOCH)/(60.0 * 60.0 * 24.0)
                     to_write += "%d,%d," % (_user, int(round(day)))
-                fout.write('%s\n' % to_write[:-1])
+                fcasc.write('%s\n' % to_write[:-1])
                 cascade_id += 1
             else:
                 print 'Skipping cascade %d with checkins %d.' % (cascade_id, len(cascade))
@@ -77,16 +81,34 @@ def main():
             cascade = set( [ (location, user, ts_int), ] )
             cur_location = location
 
-    # # Dump residuals
-    # print 'Dumping %d infections for cascade %d' % (len(cascade), cur_location)
-    # # Dump everything in cascade into file as a single cascade
-    # fout.write("%d;" % cascade_id)
-    # for _location, _user, _ts in cascade:
-    #     fout.write("%d,%d," % (_user, _ts))
-    # fout.write('\n')
+    if INSERT_AUX_NODES:
+        # Dump the remaining newly created nodes
+        for node_num in range(max(valid_uids), next_node_num):
+            fout.write("%d,%d\n" % (node_num, node_num))
+        fout.write("\n")
+
+        # Copy cascades from the temp file into the cascades file
+        fcasc.seek(0)
+        for line in fcasc:
+            fout.write(line)
+        fcasc.close()
 
     fin.close()
     fout.close()
+
+    # Write ground truth
+    all_uids = valid_uids | set(range(max(valid_uids), next_node_num))
+    for uid in sorted(list(all_uids)):
+        fground.write('%d,%d\n' % (uid, uid))
+    fground.write('\n')
+    for x in sorted(list(all_uids)):
+        for y in sorted(list(all_uids)):
+            if x != y:
+                c_str = '%d,%d,' % (x, y)
+                for ts in range(1, TIME_LIMIT, TIME_INT):
+                    c_str += '%d,%f,' % (ts, 0.00)
+                fground.write(c_str[:-1] + '\n')
+    fground.close()
 
 
 if __name__ == '__main__':

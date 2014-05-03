@@ -3,12 +3,14 @@ from data_prep.utils import *
 import random
 import numpy as np
 import sys
+import tempfile
 
 
 # NUM_CASCADES = 200
 WALK_LEN = 10
 TIME_LIMIT = 15
 INFOPATH_FORMAT = True
+INSERT_AUX_NODES = True
 
 def main():
     if len(sys.argv) != 3:
@@ -35,7 +37,7 @@ def main():
                 if u not in added_nodes:
                     added_nodes.add(u)
                     G.add_node(u)
-            G.add_edge(u1, u2, weight=np.random.uniform(0.01, 1))
+            G.add_edge(u1, u2, weight=np.random.uniform(0.05, 2.00))
         except ValueError:
             print line
 
@@ -50,26 +52,25 @@ def main():
         fgr.write(str(edge[0]) + "," + str(edge[1]) + "," + str(edge_labels[edge]) + "\n")
     fgr.close()
 
-    if INFOPATH_FORMAT:
-        for uid in sorted(list(added_nodes)):
-            fgr_c.write('%d,%d\n' % (uid, uid))
-        fgr_c.write('\n')
-        for edge in edge_labels:
-            c_str = '%d,%d,' % (edge[0], edge[1])
-            for ts in range(TIME_LIMIT):
-                c_str += '%d,%f,' % (ts, edge_labels[edge])
-            fgr_c.write(c_str[:-1] + '\n')
-    fgr_c.close()
-
     # Write all the nodes to cascades file
     for uid in sorted(added_nodes):
         fout.write("%s,%s\n" % (uid, uid))
-    fout.write("\n")
 
+    if INSERT_AUX_NODES:
+        # If auxiliary nodes are to be inserted, more node names need to be added.
+        # So, write an incomplete cascade file, and come back to this later.
+        ftemp = tempfile.NamedTemporaryFile()
+        fcasc = ftemp
+        next_node_num = max(added_nodes) + 1
+    else:
+        fout.write("\n")
+        fcasc = fout
+
+    i = 0
+    # for xyz in range(2):
     cascade_edge_count = {}
     for edge in G.edges():
         cascade_edge_count[edge] = 0
-    i = 0
     while 0 in [cascade_edge_count[key] for key in cascade_edge_count]:
         # Pick a random node and start a random walk of length walk_len, with memory
         start_node = random.sample(added_nodes, 1)[0]
@@ -94,6 +95,8 @@ def main():
             for neighbor in set(G.neighbors(cur_node)):
                 trans_rate = G.get_edge_data(cur_node, neighbor)['weight']
                 activation_time = int(np.ceil(cur_time + np.random.exponential(1.0 / trans_rate)))
+                # activation_time = int(np.ceil(cur_time + np.random.power(trans_rate)))
+                # activation_time = int(np.ceil(cur_time + np.random.rayleigh(1.0/trans_rate)))
                 if neighbor not in activation or activation_time < activation[neighbor]:
                     activation[neighbor] = activation_time
                 depth[neighbor] = depth[cur_node] + 1
@@ -107,14 +110,50 @@ def main():
             continue
 
         if INFOPATH_FORMAT:
-            fout.write("%d;" % i)
+            fcasc.write("%d;" % i)
         i += 1
         cascade.sort(key=lambda tup: tup[1])
-        cascade_str_array = []
+
+        if INSERT_AUX_NODES:
+            cascade_str_array = ['%d,%d' % (next_node_num, 1), ]
+            next_node_num += 1
+        else:
+            cascade_str_array = []
+
         for elem in cascade:
             cascade_str_array.append(str(elem[0]) + "," + str(elem[1]))
-        fout.write(",".join(cascade_str_array) + "\n")
+        fcasc.write(",".join(cascade_str_array) + "\n")
+
+    if INSERT_AUX_NODES:
+        # Dump the remaining newly created nodes
+        for node_num in range(max(added_nodes), next_node_num):
+            fout.write("%d,%d\n" % (node_num, node_num))
+        fout.write("\n")
+
+        # Copy cascades from the temp file into the cascades file
+        fcasc.seek(0)
+        for line in fcasc:
+            fout.write(line)
+        fcasc.close()
+
     fout.close()
+
+    if INFOPATH_FORMAT:
+        if INSERT_AUX_NODES:
+            added_nodes_all = added_nodes | set(range(max(added_nodes), next_node_num))
+        for uid in sorted(list(added_nodes_all)):
+            fgr_c.write('%d,%d\n' % (uid, uid))
+        fgr_c.write('\n')
+        # Write cartesian product
+        # all_pairs = [(x, y) for y for x in sorted(list(added_nodes))]
+        for x in sorted(list(added_nodes_all)):
+            for y in sorted(list(added_nodes_all)):
+                if x != y:
+                    c_str = '%d,%d,' % (x, y)
+                    for ts in range(TIME_LIMIT):
+                        c_str += '%d,%f,' % (ts, 0.00)
+                    fgr_c.write(c_str[:-1] + '\n')
+    fgr_c.close()
 
 
 if __name__ == '__main__':
