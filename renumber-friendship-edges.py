@@ -44,10 +44,19 @@ def main():
             us, lat, lng, tm, loc = line[:-1].split(',')
             if int(us) in added_nodes:
                 # f_new_chk.write('%s,%d,%s\n' % (loc, nodemap[int(us)], tm))
-                to_write.append( '%s,%d,%s\n' % (loc, nodemap[int(us)], tm) )
-        to_write.sort(key=lambda x:int(x.split(',')[0]))
-        for line in to_write:
-            f_new_chk.write(line)
+                if loc != '':
+                    to_write.append( '%s,%d,%s\n' % (loc, nodemap[int(us)], tm) )
+
+        try:
+            to_write.sort(key=lambda x:int(x.split(',')[0]))
+            for line in to_write:
+                f_new_chk.write(line)
+        except ValueError:
+            try:
+                for item in to_write:
+                    temp = int(item.split(',')[0])
+            except ValueError:
+                print item
 
 
 if __name__ == '__main__':

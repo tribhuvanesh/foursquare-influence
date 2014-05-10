@@ -10,7 +10,8 @@ import tempfile
 WALK_LEN = 10
 TIME_LIMIT = 15
 INFOPATH_FORMAT = True
-INSERT_AUX_NODES = True
+INSERT_AUX_NODES = False
+REPEAT_NUM = 4
 
 def main():
     if len(sys.argv) != 3:
@@ -67,62 +68,62 @@ def main():
         fcasc = fout
 
     i = 0
-    # for xyz in range(2):
-    cascade_edge_count = {}
-    for edge in G.edges():
-        cascade_edge_count[edge] = 0
-    while 0 in [cascade_edge_count[key] for key in cascade_edge_count]:
-        # Pick a random node and start a random walk of length walk_len, with memory
-        start_node = random.sample(added_nodes, 1)[0]
-        visited_nodes = set()
-        start_time = 1
-        cutoff_time = TIME_LIMIT
-        cur_time = start_time
-        visit_str = ""
-        s = list()
-        s.append(start_node)
-        depth = {}
-        activation = {}
-        #Change this line to random
-        activation[start_node] = start_time
-        depth[start_node] = 0
-        cascade = []
-        while (len(s) != 0):
-            cur_node = s.pop()
-            if depth[cur_node] > WALK_LEN:
+    for xyz in range(REPEAT_NUM):
+        cascade_edge_count = {}
+        for edge in G.edges():
+            cascade_edge_count[edge] = 0
+        while 0 in [cascade_edge_count[key] for key in cascade_edge_count]:
+            # Pick a random node and start a random walk of length walk_len, with memory
+            start_node = random.sample(added_nodes, 1)[0]
+            visited_nodes = set()
+            start_time = 1
+            cutoff_time = TIME_LIMIT
+            cur_time = start_time
+            visit_str = ""
+            s = list()
+            s.append(start_node)
+            depth = {}
+            activation = {}
+            #Change this line to random
+            activation[start_node] = start_time
+            depth[start_node] = 0
+            cascade = []
+            while (len(s) != 0):
+                cur_node = s.pop()
+                if depth[cur_node] > WALK_LEN:
+                    continue
+                cur_time = activation[cur_node]
+                for neighbor in set(G.neighbors(cur_node)):
+                    trans_rate = G.get_edge_data(cur_node, neighbor)['weight']
+                    activation_time = int(np.round(cur_time + np.random.exponential(1.0 / trans_rate)))
+                    # activation_time = int(np.ceil(cur_time + np.random.power(trans_rate)))
+                    # activation_time = int(np.ceil(cur_time + np.random.rayleigh(1.0/trans_rate)))
+                    if neighbor not in activation or activation_time < activation[neighbor]:
+                        activation[neighbor] = activation_time
+                    depth[neighbor] = depth[cur_node] + 1
+                    if activation_time <= cutoff_time:
+                        cascade_edge_count[(cur_node, neighbor)] += 1
+                    s.append(neighbor)
+            for node in activation:
+                if activation[node] <= cutoff_time:
+                    cascade.append((node, activation[node]))
+            if len(cascade) == 1:
                 continue
-            cur_time = activation[cur_node]
-            for neighbor in set(G.neighbors(cur_node)):
-                trans_rate = G.get_edge_data(cur_node, neighbor)['weight']
-                activation_time = int(np.ceil(cur_time + np.random.exponential(1.0 / trans_rate)))
-                # activation_time = int(np.ceil(cur_time + np.random.power(trans_rate)))
-                # activation_time = int(np.ceil(cur_time + np.random.rayleigh(1.0/trans_rate)))
-                if neighbor not in activation or activation_time < activation[neighbor]:
-                    activation[neighbor] = activation_time
-                depth[neighbor] = depth[cur_node] + 1
-                if activation_time <= cutoff_time:
-                    cascade_edge_count[(cur_node, neighbor)] += 1
-                s.append(neighbor)
-        for node in activation:
-            if activation[node] <= cutoff_time:
-                cascade.append((node, activation[node]))
-        if len(cascade) == 1:
-            continue
 
-        if INFOPATH_FORMAT:
-            fcasc.write("%d;" % i)
-        i += 1
-        cascade.sort(key=lambda tup: tup[1])
+            if INFOPATH_FORMAT:
+                fcasc.write("%d;" % i)
+            i += 1
+            cascade.sort(key=lambda tup: tup[1])
 
-        if INSERT_AUX_NODES:
-            cascade_str_array = ['%d,%d' % (next_node_num, 1), ]
-            next_node_num += 1
-        else:
-            cascade_str_array = []
+            if INSERT_AUX_NODES:
+                cascade_str_array = ['%d,%d' % (next_node_num, 1), ]
+                next_node_num += 1
+            else:
+                cascade_str_array = []
 
-        for elem in cascade:
-            cascade_str_array.append(str(elem[0]) + "," + str(elem[1]))
-        fcasc.write(",".join(cascade_str_array) + "\n")
+            for elem in cascade:
+                cascade_str_array.append(str(elem[0]) + "," + str(elem[1]))
+            fcasc.write(",".join(cascade_str_array) + "\n")
 
     if INSERT_AUX_NODES:
         # Dump the remaining newly created nodes
@@ -141,6 +142,8 @@ def main():
     if INFOPATH_FORMAT:
         if INSERT_AUX_NODES:
             added_nodes_all = added_nodes | set(range(max(added_nodes), next_node_num))
+        else:
+            added_nodes_all = added_nodes
         for uid in sorted(list(added_nodes_all)):
             fgr_c.write('%d,%d\n' % (uid, uid))
         fgr_c.write('\n')

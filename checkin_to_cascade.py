@@ -4,17 +4,23 @@ import tempfile
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 MIN_CHECKINS = 2
-NEW_EPOCH = 1262304000 # 1-Jan-2010
+# NEW_EPOCH = 1262304000 # 1-Jan-2010
 # NEW_EPOCH = 1293840000 # 1-Jan-2011
+NEW_EPOCH = 1322697600 # 1-Dec-2011
 TIME_LIMIT = 350
 TIME_INT = 100
-INSERT_AUX_NODES = True
+INSERT_AUX_NODES = False
 
 def main():
-    fin = open('data/paris-aux/Paris_checkins-renum.txt', 'r')
-    fout = open('data/paris-aux/cascades-paris-renum.txt', 'w')
-    fground = open('data/paris-aux/cascades-paris-ground-truth.txt', 'w')
-    fusers = open('data/paris-aux/friendships-users-renum.txt', 'r')
+    # fin = open('data/paris-aux/Paris_checkins-renum.txt', 'r')
+    # fout = open('data/paris-aux/cascades-paris-renum.txt', 'w')
+    # fground = open('data/paris-aux/cascades-paris-ground-truth.txt', 'w')
+    # fusers = open('data/paris-aux/friendships-users-renum.txt', 'r')
+
+    fin = open('data/umn/boston/all_checkins_near_boston-renum.txt', 'r')
+    fout = open('data/umn/boston/cascades.txt', 'w')
+    fground = open('data/umn/boston/cascades-ground-truth.txt', 'w')
+    fusers = open('data/umn/boston/frienship-boston-renum.txt', 'r')
 
     # Read all valid users and create a set
     # Also write all the users as-is to output cascades file
@@ -97,7 +103,10 @@ def main():
     fout.close()
 
     # Write ground truth
-    all_uids = valid_uids | set(range(max(valid_uids), next_node_num))
+    if INSERT_AUX_NODES:
+        all_uids = valid_uids | set(range(max(valid_uids), next_node_num))
+    else:
+        all_uids = valid_uids
     for uid in sorted(list(all_uids)):
         fground.write('%d,%d\n' % (uid, uid))
     fground.write('\n')
@@ -108,6 +117,7 @@ def main():
                 for ts in range(1, TIME_LIMIT, TIME_INT):
                     c_str += '%d,%f,' % (ts, 0.00)
                 fground.write(c_str[:-1] + '\n')
+                break
     fground.close()
 
 
