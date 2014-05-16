@@ -20,8 +20,8 @@ def read_csv_file_and_return_tuples(filename):
     return tuples
 
 
-def get_unconnected_users():
-    fnofriends = open('no_friends.out', 'r')
+def get_unconnected_users(no_users_fn):
+    fnofriends = open(no_users_fn, 'r')
     no_friends = {}
     for line in fnofriends:
         no_friends[int(line.strip())] = 1
