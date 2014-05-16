@@ -18,19 +18,19 @@ loc_dict = {
 RADIUS = 100 # in kilometers
 
 # Other constants
-# WCL = 2290997
-WCL = 396635
+WCL = 2290997
+# WCL = 396635
 
 def main():
-    if len(sys.argv) < 2:
-        sys.exit('Format: checkins_near input_checkins_file [location1] [location2] ...')
+    if len(sys.argv) < 3:
+        sys.exit('Format: checkins_near input_checkins_file socialgraph [location1] [location2] ...')
 
-    if len(sys.argv) > 2:
-        locations = sys.argv[2:]
+    if len(sys.argv) > 3:
+        locations = sys.argv[3:]
     else:
         locations = loc_dict.keys()
 
-    socialgraph = 'data/umn/friendship.csv'
+    socialgraph = sys.argv[2]
 
     for location in locations:
         print '---- %s ----' % location.upper()
