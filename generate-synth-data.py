@@ -11,7 +11,9 @@ WALK_LEN = 10
 TIME_LIMIT = 15
 INFOPATH_FORMAT = True
 INSERT_AUX_NODES = False
-REPEAT_NUM = 4
+REPEAT_NUM = 1
+GEN_FULL = True # Setting this to True will generate infections over all edges, otherwise with prob. MIX_PERC
+MIX_PERC = 0.5
 
 def main():
     if len(sys.argv) != 3:
@@ -72,7 +74,12 @@ def main():
         cascade_edge_count = {}
         for edge in G.edges():
             cascade_edge_count[edge] = 0
-        while 0 in [cascade_edge_count[key] for key in cascade_edge_count]:
+        # Continue generating if there exists even a single edge without an infection
+        gen_more_1 = lambda ecount_dct : 0 in ecount_dct.values()
+        # Continue infecting, until 75% of the edges have an infection
+        gen_more_2 = lambda ecount_dct : (ecount_dct.values().count(0) / float(len(ecount_dct))) > MIX_PERC
+        gen_more = (gen_more_2, gen_more_1)[int(GEN_FULL)]
+        while gen_more(cascade_edge_count):
             # Pick a random node and start a random walk of length walk_len, with memory
             start_node = random.sample(added_nodes, 1)[0]
             visited_nodes = set()
@@ -95,7 +102,7 @@ def main():
                 cur_time = activation[cur_node]
                 for neighbor in set(G.neighbors(cur_node)):
                     trans_rate = G.get_edge_data(cur_node, neighbor)['weight']
-                    activation_time = int(np.round(cur_time + np.random.exponential(1.0 / trans_rate)))
+                    activation_time = int(np.ceil(cur_time + np.random.exponential(1.0 / trans_rate)))
                     # activation_time = int(np.ceil(cur_time + np.random.power(trans_rate)))
                     # activation_time = int(np.ceil(cur_time + np.random.rayleigh(1.0/trans_rate)))
                     if neighbor not in activation or activation_time < activation[neighbor]:
@@ -156,6 +163,7 @@ def main():
                     for ts in range(TIME_LIMIT):
                         c_str += '%d,%f,' % (ts, 0.00)
                     fgr_c.write(c_str[:-1] + '\n')
+            break
     fgr_c.close()
 
 
